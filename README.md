@@ -1,6 +1,6 @@
 OpenCode Workflow Commands
 
-This folder is the single source of truth for your global OpenCode workflow commands.
+This folder is the single source of truth for the global OpenCode workflow commands.
 
 Contents:
 
