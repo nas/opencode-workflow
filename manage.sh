@@ -3,70 +3,77 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SOURCE_DIR="$ROOT_DIR/commands"
 CONFIG_DIR="${OPENCODE_CONFIG_DIR:-$HOME/.config/opencode}"
-TARGET_DIR="$CONFIG_DIR/commands"
 MODE="${1:-status}"
 
 print_usage() {
-  printf "Usage: %s <install|pull|status>\n" "$0"
+  printf "Usage: %s <install|status|unlink>\n" "$0"
 }
 
-install_commands() {
-  mkdir -p "$CONFIG_DIR"
+install_config() {
+  mkdir -p "$(dirname "$CONFIG_DIR")"
 
-  if [ -L "$TARGET_DIR" ]; then
-    rm "$TARGET_DIR"
-  elif [ -d "$TARGET_DIR" ]; then
-    BACKUP_DIR="${TARGET_DIR}.backup.$(date +%Y%m%d%H%M%S)"
-    mv "$TARGET_DIR" "$BACKUP_DIR"
-    printf "Backed up existing commands to: %s\n" "$BACKUP_DIR"
+  if [ -L "$CONFIG_DIR" ]; then
+    EXISTING_TARGET="$(readlink "$CONFIG_DIR")"
+    if [ "$EXISTING_TARGET" = "$ROOT_DIR" ]; then
+      printf "Already linked: %s -> %s\n" "$CONFIG_DIR" "$ROOT_DIR"
+      return
+    fi
+    rm "$CONFIG_DIR"
+  elif [ -d "$CONFIG_DIR" ]; then
+    BACKUP_DIR="${CONFIG_DIR}.backup.$(date +%Y%m%d%H%M%S)"
+    mv "$CONFIG_DIR" "$BACKUP_DIR"
+    printf "Backed up existing config to: %s\n" "$BACKUP_DIR"
+  elif [ -e "$CONFIG_DIR" ]; then
+    BACKUP_FILE="${CONFIG_DIR}.backup.$(date +%Y%m%d%H%M%S)"
+    mv "$CONFIG_DIR" "$BACKUP_FILE"
+    printf "Backed up existing file to: %s\n" "$BACKUP_FILE"
   fi
 
-  ln -s "$SOURCE_DIR" "$TARGET_DIR"
-  printf "Linked commands: %s -> %s\n" "$TARGET_DIR" "$SOURCE_DIR"
+  ln -s "$ROOT_DIR" "$CONFIG_DIR"
+  printf "Linked config: %s -> %s\n" "$CONFIG_DIR" "$ROOT_DIR"
 }
 
-pull_commands() {
-  if [ ! -d "$TARGET_DIR" ]; then
-    printf "No commands directory found at %s\n" "$TARGET_DIR"
+unlink_config() {
+  if [ ! -L "$CONFIG_DIR" ]; then
+    printf "Config path is not a symlink: %s\n" "$CONFIG_DIR"
     exit 1
   fi
 
-  mkdir -p "$SOURCE_DIR"
-  cp "$TARGET_DIR"/*.md "$SOURCE_DIR"/
-  printf "Pulled command files from %s into %s\n" "$TARGET_DIR" "$SOURCE_DIR"
+  TARGET="$(readlink "$CONFIG_DIR")"
+  rm "$CONFIG_DIR"
+  mkdir -p "$CONFIG_DIR"
+  printf "Removed symlink. Created empty config dir at %s (was -> %s)\n" "$CONFIG_DIR" "$TARGET"
 }
 
-status_commands() {
+status_config() {
+  printf "Repo dir: %s\n" "$ROOT_DIR"
   printf "Config dir: %s\n" "$CONFIG_DIR"
-  printf "Target dir: %s\n" "$TARGET_DIR"
-  printf "Source dir: %s\n" "$SOURCE_DIR"
 
-  if [ -L "$TARGET_DIR" ]; then
+  if [ -L "$CONFIG_DIR" ]; then
     printf "Status: symlinked\n"
-    printf "Symlink target: %s\n" "$(readlink "$TARGET_DIR")"
-  elif [ -d "$TARGET_DIR" ]; then
+    printf "Symlink target: %s\n" "$(readlink "$CONFIG_DIR")"
+  elif [ -d "$CONFIG_DIR" ]; then
     printf "Status: directory (not symlinked)\n"
   else
     printf "Status: missing\n"
   fi
 
-  if [ -d "$SOURCE_DIR" ]; then
+  if [ -d "$ROOT_DIR/commands" ]; then
     printf "Tracked command files:\n"
-    ls "$SOURCE_DIR"
+    ls "$ROOT_DIR/commands"
   fi
 }
 
 case "$MODE" in
   install)
-    install_commands
-    ;;
-  pull)
-    pull_commands
+    install_config
     ;;
   status)
-    status_commands
+    status_config
+    ;;
+  unlink)
+    unlink_config
     ;;
   *)
     print_usage
